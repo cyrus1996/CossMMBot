@@ -24,6 +24,7 @@ In a futur update they could be splitted in several smaller files.
 
 This file is a tester, it should be used before using the **index.js** file 
 its purpose is to show you what orders are going to be opened and at which price, it source code also contains detailed commentary, that are not in the **index.js** file.
+**IMPORTANT this files doesn't require you private keys, but thus you have to manually tell the bot how many currency you have, you can see examples at the getWallet function**
   
 Its output is similar to this : 
 
