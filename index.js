@@ -1313,16 +1313,6 @@ class MMBot {
 
 							var price_ceil = await this._ceil(price,this._decimal.get(pair)["price_decimal"]);
 
-							console.log("LOG: price ", price);
-
-							console.log("LOG: bids0 ", this._spec[pair]["orderbook"]["bids"][0]);
-
-							console.log("LOG: diviseur ", this._spec[pair]["profit"] / 100 + 1);
-
-							console.log("LOG: price ceil ", price_ceil);
-
-							console.log("LOG: val ", val);
-
 							price = val / price_ceil >= (this._spec[pair]["profit"] / 100 + 1) ? price_ceil : await this._floor(price,this._decimal.get(pair)["price_decimal"]);
 
 							while (val / price < (this._spec[pair]["profit"] / 100 + 1)) {
