@@ -516,46 +516,7 @@ class MMBot {
 	 */
 
 	async getWallet(){
-
-		// return new Promise((resolve,reject) => {
-
-		// 	var $time = new Date().getTime() - 3000;
-
-		// 	var hmac = $crypto.createHmac("sha256",$private)
-
-		// 	var $payload = "recvWindow=5000&timestamp=" + $time;
-
-		// 	hmac.update($payload);
-
-		// 	var options = {
-		// 		host: "trade.coss.io",
-		// 		path: "/c/api/v1/account/balances?" + $payload,
-		// 		headers: {
-		// 			"Host": "trade.coss.io",
-		// 			"Authorization": $public,
-		// 			"Signature": hmac.digest("hex")
-		// 		}
-		// 	}
-
-		// 	$https.get(options,(res) => {
-		// 		var $data = "";
-
-		// 		res.on("data", (chunk) => {
-		// 			$data += chunk.toString();
-		// 		});
-
-		// 		res.on("end", () => {
-		// 			let data = JSON.parse($data);
-
-		// 			data.forEach((value) => {
-		// 				this._wallet[value['currency_code']] = value['available'];
-		// 			});
-
-		// 			resolve(true);
-		// 		});
-		// 	});
-		// });
-
+		
 		return new Promise((resolve,reject) => {
 
 			this._wallet["COSS"] = 1000;
@@ -872,7 +833,7 @@ class MMBot {
 
 							changes = true;
 
-							console.log("le profit: ",this._spec[pair]["profit"])
+							console.log(" profit: ",this._spec[pair]["profit"])
 
 							var price = this._spec[pair]["orderbook"]["bids"][0] *
 							(this._spec[pair]["profit"] / 100 + 1);
@@ -883,7 +844,6 @@ class MMBot {
 							price = val / price_ceil >= (this._spec[pair]["profit"] / 100 + 1) ? price_ceil : await this._floor(price,this._decimal.get(pair)["price_decimal"]);
 
 							console.log("price inter: ",price);
-							console.log("le calcul : ", val / price," le profit " ,(this._spec[pair]["profit"] / 100 + 1))
 
 							while (val / price < (this._spec[pair]["profit"] / 100 + 1)) {
 
@@ -2088,16 +2048,12 @@ class MMBot {
 
 				while(ready){
 
-					//console.log("dans le ready du total amount")
-
 					while(ask_start < high_ask){
 
 						/**
 						 * those while loops are used to
 						 * determine the number of orders that would be created on each pair
 						 */
-
-						//console.log("dans le while asks")
 
 						quantity1 += 1
 
