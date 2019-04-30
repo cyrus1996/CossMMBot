@@ -1509,17 +1509,7 @@ class MMBot {
 							var price = this._spec[pair]["orderbook"]["asks"][0] /
 							   (this._spec[pair]["profit"] / 100 + 1);
 
-							console.log("LOG: price ", price);
-
-							console.log("LOG: asks0 ", this._spec[pair]["orderbook"]["asks"][0]);
-
-							console.log("LOG: diviseur ", this._spec[pair]["profit"] / 100 + 1);
-
 							var price_floor = await this._floor(price,this._decimal.get(pair)["price_decimal"]);
-
-							console.log("LOG: price floor ", price_floor);
-
-							console.log("LOG: valeur ", valeur);
 
 							price = price_floor / valeur >= (this._spec[pair]["profit"] / 100 + 1) ? price_floor : await this._ceil(price,this._decimal.get(pair)["price_decimal"]);
 
@@ -1756,10 +1746,6 @@ class MMBot {
 
 
 					if (data['b'][0] >= value) {
-
-						// console.log("LOG: " + new Date().toUTCString() + " usefull data received on " + pair + " bids[price]: " + data['b'][0] +
-						//  " bids[quantity]: " + data['b'][1]);
-
 
 						var price = await this._ceil(this._spec[pair]["orderbook"]["bids"][0] *
 							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]);
