@@ -1,7 +1,8 @@
 # COSSMMBOT (ENG)
 
 This is a free trading bot for the [Coss.io][plateform] exchange, its strategy is
-only market making and nothing else, the sections below give more details on how to make it work, and how it handles different situations
+only market making and nothing else, the sections below give more details on how to make it work, and how it handles different situations.
+For any questions you have a telegram group : https://t.me/cossmmbot 
 
 ## Requirements
 
@@ -348,7 +349,7 @@ If set to `true` the will do its best to make the spread of the pair as close as
 ## Donations :
 
 ```
-BTC : 
-ETH : 
+BTC : 35Tv25zVtwvDSt3unxpctUpcUwo2cLcwBG
+ETH : 0xFa871bf7c97A9E062a7727bc67390471636E4CbF
 ```
 [plateform]: https://coss.io
