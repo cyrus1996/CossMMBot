@@ -1163,8 +1163,6 @@ class MMBot {
 					for(var valeur of this._spec[pair]["orderbook"]["bids"]){
 
 						if (data['b'][0] == valeur) {
-							console.log("changement du changes");
-							console.log("le profit: ",this._spec[pair]["profit"])
 							changes = true;
 
 							var price = this._spec[pair]["orderbook"]["asks"][0] /
@@ -2023,25 +2021,6 @@ class MMBot {
 
 					 setTimeout(async() => {
 
-					 // 	var result_asks = orders_asks.map(async(value) => {
-
-						// if(await this.openOrder(value[0],value[1],"SELL",$pair))this._spec[$pair]["orderbook"]["asks"].push(value[0]);
-						// 	return true;
-
-						// })
-
-						// var result_bids = orders_bids.map(async(value) => {
-
-						// if(await this.openOrder(value[0],value[1],"BUY",$pair))this._spec[$pair]["orderbook"]["bids"].push(value[0]);
-						// 	return true;
-
-						// })
-
-						// await Promise.all(result_asks);
-						// await Promise.all(result_bids);
-						// this._spec[$pair]["orderbook"]["bids"].sort().reverse()
-						// this._spec[$pair]["orderbook"]["asks"].sort()
-
 						for(var value of orders_asks){
 
 							if(await this.openOrder(value[0],value[1],"SELL",$pair))this._spec[$pair]["orderbook"]["asks"].push(value[0]);
@@ -2128,10 +2107,6 @@ class MMBot {
 
 					while(bid_start > low_bid){
 
-						//console.log("dans le while bids")
-
-						//console.log("bid start: ", bid_start, " low bids: ", low_bid);
-
 						quantity2 += 1
 
 						bid_start = await this._floor(bid_start / profit, dec);
@@ -2207,14 +2182,7 @@ class MMBot {
 
 				while (ready){
 
-					//console.log("dans le ready principal")
-
 					while(ask_start < high_ask){
-
-						//console.log("dans le while asks")
-
-						//console.log("asks start", ask_start)
-						//console.log("high ask", high_ask)
 
 						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],ask_start,$pair)
 
@@ -2227,11 +2195,6 @@ class MMBot {
 					}
 
 					while(bid_start > low_bid){
-
-						//console.log("dans le while bids")
-
-						//console.log("bid start", bid_start)
-						//console.log("low", low_bid)
 
 						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],bid_start,$pair)
 
@@ -2253,15 +2216,11 @@ class MMBot {
 						profit *= this._spec[$pair]["profit"]/100 +1 ;
 
 						ask_start = $asks;
-
-					//	console.log("previous bids: ", $bids)
 						
 						while($asks / $bids < (profit - 1)  * 2 + 1 ){
 							$bids = await this._floor(($bids * 10 ** dec - 1) / 10 ** dec, dec);
 
 						}
-
-					//	console.log("next bids: ", $bids)
 						quantity1 = 0;
 						quantity2 = 0;
 						bid_start = $bids;
@@ -2338,19 +2297,6 @@ class MMBot {
 
 					}
 
-					// for(var value of orders_asks){
-
-
-					// 	if(await this.openOrder(value[0],value[1],"SELL",$pair))this._spec[$pair]["orderbook"]["asks"].push(value[0]);
-
-					// }
-
-					// for(var value of orders_bids){
-
-					// 	if(await this.openOrder(value[0],value[1],"BUY",$pair))this._spec[$pair]["orderbook"]["bids"].push(value[0]);
-
-					// }
-
 					this._spec[$pair]["orderbook"]["asks_length"] = this._spec[$pair]["orderbook"]["asks"].length;
 					this._spec[$pair]["orderbook"]["bids_length"] = this._spec[$pair]["orderbook"]["bids"].length;
 
@@ -2403,7 +2349,6 @@ class MMBot {
 		} 
 
 		if (side == "BUY") {
-			//console.log(`on retire ${price*quantity} a notre wallet en ${$pairs[1]}`)
 			this._wallet[$pairs[1]] -= price*quantity;
 			if (this._wallet[$pairs[1]] < 0) {
 
@@ -2415,7 +2360,6 @@ class MMBot {
 
 		} else {
 
-			//console.log(`on retire ${quantity} a notre wallet en ${$pairs[0]}`)
 			this._wallet[$pairs[0]] -= quantity;
 			if (this._wallet[$pairs[0]] < 0) {
 
