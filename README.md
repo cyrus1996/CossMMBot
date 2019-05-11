@@ -206,10 +206,11 @@ var coss = new MMBot({
 To create an instance of the class you should use such declaration :  
 
 ```javascript
-var coss =  new  MMBot({
+var bot = require("cossmmbot");
+var coss =  new  bot({
 	"COSS_ETH": {/*<your specifications>*/},
 	"COSS_BTC": {/*<your specifications>*/}
-})
+},"YOUR PRIVATE","YOUR PUBLIC");
 ```
 
 Now we will see deeper what each argument means: 
