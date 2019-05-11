@@ -6,19 +6,22 @@ const $crypto = require("crypto");
 const $fs = require("fs");
 const $events = require("events"); 
 const $assert = require("assert").strict;
-const $private = "";
-const $public = "";
+var $private = "";
+var $public = "";
 
 class MMBot {
 
 	/**
 	 * The main and unique class for market making on 
 	 * the COSS plateform for a complete documentation
-	 * see : https://
+	 * see : https://github.com/cyrus1996/CossMMBot
 	 */
 
 
-	constructor($spec){
+	constructor($spec,priv,pub){
+
+		$private = priv;
+		$public = pub;
 
 		/**
 		 * @var _spec <Object>
@@ -91,6 +94,7 @@ class MMBot {
 		 * this variable is used to make the call
 		 * to the specific exchange url to cancel 
 		 * all of open orders regardless of the pair
+		 * for more details see spec []
 		 */
 
 		this._cookie = "";
@@ -127,7 +131,16 @@ class MMBot {
 
 		this._exception = 0;
 
-		this._exit = 0
+		this._exit = 0;
+
+		this._interval = {
+
+			"pair": [],
+			"index": 0,
+			"side": true,
+			"lock": true
+
+		}
 
 		process.on("SIGINT", async () => {
 
@@ -393,11 +406,32 @@ class MMBot {
 		 */
 
 		process.stdin.on("data", async (data) => {
+
 			data = data.toString().replace("\n","").replace("\r","");
 
-			this._cookie = data;
+			switch(data){
+
+				case "getwallet":
+					this.getWallet(1).then(value => {
+
+						console.log(this._wallet);
+
+					});
+					break;
+
+				default:
+
+				this._cookie = data;
+				break;
+			}
 
 		});
+
+		setInterval(async() => {
+
+			await this.getWallet(1);
+
+		},300000);
 
 		/**
 		 * this interval is used in order 
@@ -410,6 +444,23 @@ class MMBot {
 			this._callcounter < 0 ? this._callcounter = 0 : false;
 
 		},900)
+
+		setInterval(async () => {
+
+			if (this._interval["pair"].length && this._interval["lock"]) {
+
+				var champ = this._interval["side"] ? "asks" : "bids";
+
+				this._interval["lock"] = false;
+				await this.checkOne(this._interval["pair"][this._interval["index"]],this._interval["side"]);
+				this._interval["side"] = !this._interval["side"];
+				this._interval["side"] ? this._interval["index"]++ : false;
+				this._interval["index"] = this._interval["index"] >= this._interval["pair"].length ? 0 : this._interval["index"];
+				this._interval["lock"] = true;
+
+			}
+
+		},20000)
 
 		/**
 		 * Populates our wallet 
@@ -424,6 +475,7 @@ class MMBot {
 			for(var pair in this._spec){
 
 				await this.createSocket(pair);
+				this._interval["pair"].push(pair);
 
 			}
 
@@ -807,7 +859,7 @@ class MMBot {
 	 * and stores the results in the _wallet variable
 	 */
 
-	async getWallet(){
+	async getWallet(ref = 0){
 
 		console.log("LOG: " + new Date().toUTCString() + " getting our wallet ");
 
@@ -854,18 +906,36 @@ class MMBot {
 
 					} catch(err){
 
-						console.log("\x1B[91;1mFATAL ERROR: " + new Date().toUTCString() + " An error occured while getting the wallet amounts " +
+						if (ref == 0) {
+
+							console.log("\x1B[91;1mFATAL ERROR: " + new Date().toUTCString() + " An error occured while getting the wallet amounts " +
 							"this cant allow us to continue exiting\x1B[0m ", err);
-						process.exit();
+							process.exit();
+
+						} else {
+
+							console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " Unable to retrive Wallet informations try again");
+							resolve(true);
+
+						}
 
 					}
 				});
 
 				res.on("error", async err => {
 
-					console.log("\x1B[91;1mFATAL ERROR: " + new Date().toUTCString() + " An error occured while getting the wallet amounts " +
-							"this cant allow us to continue exiting\x1B[0m ", err);
-					process.exit();
+					if (ref == 0) {
+
+						console.log("\x1B[91;1mFATAL ERROR: " + new Date().toUTCString() + " An error occured while getting the wallet amounts " +
+						"this cant allow us to continue exiting\x1B[0m ", err);
+						process.exit();
+
+					} else {
+
+						console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " Unable to retrive Wallet informations try again");
+						resolve(true);
+
+					}
 
 				})
 			});
@@ -942,7 +1012,23 @@ class MMBot {
 
 	async createSocket($pair,ref = 0){
 
-		this._spec[$pair]["poll"] = [];
+		if (!this._spec[$pair]["created"]) {
+
+			this._spec[$pair]["poll"] = [];
+			this._spec[$pair]["a_id"] = {};
+ 			this._spec[$pair]["b_id"] = {};
+ 			this._spec[$pair]["a_time"] = {};
+ 			this._spec[$pair]["b_time"] = {};
+
+ 			/**
+			 * thoses are variables used if we set overflow
+			 * to false and reach our order price bourdary
+			 */
+
+			this._spec[$pair]["reminder_asks"] = false;
+			this._spec[$pair]["reminder_bids"] = false;
+
+		}
 
 		this._spec[$pair]["lock"] = true;
 
@@ -973,14 +1059,6 @@ class MMBot {
 		}
 
 		console.log("LOG: " + new Date().toUTCString() + " opening socket on " + $pair);
-
-		/**
-		 * thoses are variables used if we set overflow
-		 * to false and reach our order price bourdary
-		 */
-
-		this._spec[$pair]["reminder_asks"] = false;
-		this._spec[$pair]["reminder_bids"] = false;
 
 		return new Promise((resolve,reject) => {
 
@@ -1130,8 +1208,8 @@ class MMBot {
 
 								} else if (x["b"].length) {
 
-									console.log("LOG: " + new Date().toUTCString() + " data received on " + $pair + " asks[price]: " + x['b'][0] +
-									" asks[quantity]: " + x['b'][1] + " frame timestamp: " + x['t']);
+									console.log("LOG: " + new Date().toUTCString() + " data received on " + $pair + " bids[price]: " + x['b'][0] +
+									" bids[quantity]: " + x['b'][1] + " frame timestamp: " + x['t']);
 
 								}
 
@@ -1142,6 +1220,14 @@ class MMBot {
 								} else if (x["b"][1] == 0) {
 
 									this._spec[$pair]["poll"].push(x);
+
+								} else if (this._spec[$pair]["orderbook"]["asks"].includes(parseFloat(x["a"][0]))) {
+
+									await this.checkTest($pair,parseFloat(x["a"][0]),"a_id")
+
+								} else if (this._spec[$pair]["orderbook"]["bids"].includes(parseFloat(x["b"][0]))) {
+
+									await this.checkTest($pair,parseFloat(x["b"][0]),"b_id")
 
 								}
 
@@ -1294,10 +1380,10 @@ class MMBot {
 						 * this means an order have been excecuted.
 						 */
 
-						if (data['a'][0] == val) {
+						if (data['a'][0] == val && parseFloat(data['t']) >= this._spec[pair]["a_time"][parseFloat(val)]) {
 
 							console.log("LOG: " + new Date().toUTCString() + " usefull data received on " + pair + " asks[price]: " + data['a'][0] +
-							" asks[quantity]: " + data['a'][1]);
+							" asks[quantity]: " + data['a'][1] + " frame timestamp: " + data['t']);
 
 							/**
 							 * if one of our asks order has been excuted we have
@@ -1334,6 +1420,7 @@ class MMBot {
 								 * the same number of order opened at each time,
 								 * so if one order got excecuted we have to add one 
 								 * above our highest ask in this case, see docs for more details.
+								 * spec [];
 								 */
 
 								/**
@@ -1366,6 +1453,9 @@ class MMBot {
 									this._wallet[$pairs[1]] += await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],val,pair) * val;
 
 									this._spec[pair]["orderbook"]["asks"].splice(this._spec[pair]["orderbook"]["asks"].indexOf(val),1);
+
+									delete this._spec[pair]["a_time"][parseFloat(val)];
+									delete this._spec[pair]["a_id"][parseFloat(val)];
 
 									if(!this._spec[pair]["orderbook"]["bids"].includes(price) && this._spec[pair]["orderbook"]["asks"][0] / price >= (this._spec[pair]["profit"] / 100 * 2 + 1) && await this.openOrder(price,amount,"BUY",pair)) this._spec[pair]["orderbook"]["bids"].unshift(price);
 
@@ -1428,6 +1518,9 @@ class MMBot {
 
 									this._wallet[$pairs[1]] += await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],val,pair) * val;
 
+									delete this._spec[pair]["a_time"][parseFloat(val)];
+									delete this._spec[pair]["a_id"][parseFloat(val)];
+
 									this._spec[pair]["orderbook"]["asks"].splice(this._spec[pair]["orderbook"]["asks"].indexOf(val),1);
 
 									if(!this._spec[pair]["orderbook"]["bids"].includes(price) && this._spec[pair]["orderbook"]["asks"][0] / price >= (this._spec[pair]["profit"] / 100 * 2 + 1) && await this.openOrder(price,amount,"BUY",pair)) this._spec[pair]["orderbook"]["bids"].unshift(price);
@@ -1454,16 +1547,6 @@ class MMBot {
 				 * protocol.
 				 */
 
-				if (!changes) {
-
-					changes = await this.updateSubAsks(data,pair,$pairs);
-
-				} else {
-
-					await this.updateSubAsks(data,pair,$pairs);
-
-				}
-
 				if (changes && this._spec[pair]["force_liquidity"]) {
 
 					await this.updateWhileAsk(pair,data);
@@ -1482,17 +1565,14 @@ class MMBot {
 
 			} else if (data['b'].length) {
 
-				console.log("LOG: " + new Date().toUTCString() + " data received on " + pair + " bids[price]: " + data['b'][0] +
-							" bids[quantity]: " + data['b'][1] + " frame timestamp: " + data['t']);
-
 				if (data['b'][1] == 0 && this._spec[pair]["orderbook"]["bids"].includes(parseFloat(data['b'][0]))) {
 
 					for(var valeur of this._spec[pair]["orderbook"]["bids"]){
 
-						if (data['b'][0] == valeur) {
+						if (data['b'][0] == valeur && parseFloat(data['t']) >= this._spec[pair]["b_time"][parseFloat(valeur)]) {
 
 							console.log("LOG: " + new Date().toUTCString() + " usefull data received on " + pair + " bids[price]: " + data['b'][0] +
-							" bids[quantity]: " + data['b'][1]);
+							" bids[quantity]: " + data['b'][1] + " frame timestamp: " + data['t']);
 
 							changes = true;
 
@@ -1529,13 +1609,16 @@ class MMBot {
 
 									this._spec[pair]["orderbook"]["bids"].splice(this._spec[pair]["orderbook"]["bids"].indexOf(valeur),1);
 
+									delete this._spec[pair]["b_time"][parseFloat(valeur)];
+									delete this._spec[pair]["b_id"][parseFloat(val)];
+
 									if(!this._spec[pair]["orderbook"]["asks"].includes(price) && price / this._spec[pair]["orderbook"]["bids"][0] >= (this._spec[pair]["profit"] / 100 * 2 + 1) && await this.openOrder(price,amount,"SELL",pair))this._spec[pair]["orderbook"]["asks"].unshift(price);
 
 								}
 
 								if (this._spec[pair]["orderbook"]["bids"].length <= this._spec[pair]["orderbook"]["bids_length"]) {
 
-									var price_new = await this._round(this._spec[pair]["orderbook"]["bids"][this._spec[pair]["orderbook"]["bids"].length - 1] /
+									var price_new = await this._floor(this._spec[pair]["orderbook"]["bids"][this._spec[pair]["orderbook"]["bids"].length - 1] /
 										(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]);
 
 									var amount_new = await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],price_new,pair);
@@ -1565,6 +1648,9 @@ class MMBot {
 
 									this._spec[pair]["orderbook"]["bids"].splice(this._spec[pair]["orderbook"]["bids"].indexOf(valeur),1);
 
+									delete this._spec[pair]["b_time"][parseFloat(valeur)];
+									delete this._spec[pair]["b_id"][parseFloat(val)];
+
 									if(!this._spec[pair]["orderbook"]["asks"].includes(price) && price / this._spec[pair]["orderbook"]["bids"][0] >= (this._spec[pair]["profit"] / 100 * 2 + 1) && await this.openOrder(price,amount,"SELL",pair))this._spec[pair]["orderbook"]["asks"].unshift(price);
 
 									break;
@@ -1576,16 +1662,6 @@ class MMBot {
 						}
 
 					}
-
-				}
-
-				if (!changes) {
-
-					changes = await this.updateSubBids(data,pair,$pairs);
-
-				} else {
-
-					await this.updateSubBids(data,pair,$pairs);
 
 				}
 
@@ -1737,6 +1813,7 @@ class MMBot {
 
 					if (data['b'][0] >= value) {
 
+
 						var price = await this._ceil(this._spec[pair]["orderbook"]["bids"][0] *
 							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]);
 
@@ -1746,7 +1823,6 @@ class MMBot {
 
 							if (this._spec[pair]["orderbook"]["asks"].length <= 1) {
 
-								console.log("le reminder: ", this._spec[pair]["reminder_asks"])
 
 									if (!this._spec[pair]["reminder_asks"]) {
 
@@ -1824,9 +1900,11 @@ class MMBot {
 
 			var price_ceil = await this._ceil(price,this._decimal.get(pair)["price_decimal"]);
 
-			price = this._spec[pair]["orderbook"]["asks"][0] / price_ceil < (this._spec[pair]["profit"]*2/100 + 1) || data["a"][0] / price_ceil < (this._spec[pair]["profit"]/100 + 1) ? await this._floor(price,this._decimal.get(pair)["price_decimal"]) : price_ceil;
+			var bask = await this._floor(this._spec[pair]["orderbook"]["asks"][0] / (this._spec[pair]["profit"]/100 + 1),this._decimal.get(pair)["price_decimal"]);
 
-			if (this._spec[pair]["orderbook"]["asks"][0] / price <= (this._spec[pair]["profit"]*2/100 + 1)|| this._spec[pair]["orderbook"]["bids"].includes(price) || data["a"][0] / price < (this._spec[pair]["profit"]/100 + 1)) {
+			price = this._spec[pair]["orderbook"]["asks"][0] / price_ceil < (this._spec[pair]["profit"]*2/100 + 1) || bask / price_ceil < (this._spec[pair]["profit"]/100 + 1) ? await this._floor(price,this._decimal.get(pair)["price_decimal"]) : price_ceil;
+
+			if (this._spec[pair]["orderbook"]["asks"][0] / price <= (this._spec[pair]["profit"]*2/100 + 1)|| this._spec[pair]["orderbook"]["bids"].includes(price) || bask / price < (this._spec[pair]["profit"]/100 + 1)) {
 
 				return true;
 
@@ -1858,11 +1936,13 @@ class MMBot {
 
 			var price_floor = await this._floor(price,this._decimal.get(pair)["price_decimal"]);
 
-			price = price_floor / this._spec[pair]["orderbook"]["bids"][0] < (this._spec[pair]["profit"]*2/100 + 1) || price_floor / data['b'][0] < (this._spec[pair]["profit"]/100 + 1) ? await this._ceil(price,this._decimal.get(pair)["price_decimal"]) : price_floor;
+			var bbid = await this._ceil(this._spec[pair]["orderbook"]["bids"][0] * (this._spec[pair]["profit"]/100 + 1),this._decimal.get(pair)["price_decimal"]);
+
+			price = price_floor / this._spec[pair]["orderbook"]["bids"][0] < (this._spec[pair]["profit"]*2/100 + 1) || price_floor / bbid < (this._spec[pair]["profit"]/100 + 1) ? await this._ceil(price,this._decimal.get(pair)["price_decimal"]) : price_floor;
 
 			var amount = await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],price,pair);
 
-			if (price / this._spec[pair]["orderbook"]["bids"][0] <= (this._spec[pair]["profit"]*2/100 + 1) || this._spec[pair]["orderbook"]["asks"].includes(price) || price / data['b'][0] < (this._spec[pair]["profit"]/100 + 1)) {
+			if (price / this._spec[pair]["orderbook"]["bids"][0] <= (this._spec[pair]["profit"]*2/100 + 1) || this._spec[pair]["orderbook"]["asks"].includes(price) || price / bbid < (this._spec[pair]["profit"]/100 + 1)) {
 
 				return true;
 
@@ -2037,7 +2117,8 @@ class MMBot {
 			"DAI",
 			"BTC",
 			"ETH",
-			"COSS"
+			"COSS",
+			"XRP"
 
 		];
 
@@ -2244,6 +2325,7 @@ class MMBot {
 					/**
 					 * Be carefull reaching here can lead 
 					 * to some lost in particular cases
+					 * see doc ________________________
 					 */
 
 					return await this.finalStripes(now["asks"], await this._floor(now["asks"]/ (this._spec[$pair]["profit"] * 2/100 + 1), dec),$pair)
@@ -2396,7 +2478,7 @@ class MMBot {
 			try{
 
 				$assert.ok(low_bid < high_ask,"The leftmost value of the range has to be the lowest")
-				$assert.ok(this._spec[$pair]["ref"] == 1 || this._spec[$pair]["ref"] == 0,"ref has to be 0 or 1 ONLY see doc");
+				$assert.ok(this._spec[$pair]["ref"] == 1 || this._spec[$pair]["ref"] == 0 || this._spec[$pair]["ref"] == 2,"ref has to be 0 or 1 ONLY see doc");
 				$assert.ok(typeof this._spec[$pair]['amount'] == "number" || this._spec[$pair]["amount"] == false,"amount has to be a number or false");
 
 			} catch(e){
@@ -2560,7 +2642,7 @@ class MMBot {
 
 				if (!orders_asks.length || !orders_bids.length) {
 
-					throw new Error("Can't have empty opening orders try your code with the sandbox");
+					console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " Can't have empty opening orders try your code with the sandbox");
 					resolve(false);
 
 				}
@@ -2806,7 +2888,7 @@ class MMBot {
 
 				if (!orders_asks.length || !orders_bids.length) {
 
-					throw new Error("Can't have empty opening orders try your code with the sandbox");
+					console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " Can't have empty opening orders try your code with the sandbox");
 					resolve(false);
 
 				}
@@ -2888,6 +2970,21 @@ class MMBot {
 		} else if ($ref == 1) {
 
 			return await this._ceil($amount/$price,this._decimal.get($pair)["amount_decimal"])
+
+		} else if ($ref == 2) {
+
+			if (!this._spec[$pair]["alt_amount"]) {
+
+				var amount = await this._ceil($amount/$price,this._decimal.get($pair)["amount_decimal"]);
+				this._spec[$pair]["alt_amount"] = amount;
+
+				return amount;
+
+			} else {
+
+				return await this._ceil((($amount/$price) + this._spec[$pair]["alt_amount"]) / 2 ,this._decimal.get($pair)["amount_decimal"]);
+
+			}
 
 		}
 
@@ -2981,7 +3078,10 @@ class MMBot {
 						} else {
 
 							console.log("LOG: " + new Date().toUTCString() +
-							 " we " + side + " " + quantity + " " + $pairs[0] + " at " + price + " on " + $pair);
+							 " we " + side + " " + quantity + " " + $pairs[0] + " at " + price + " on " + $pair + " time : " + $response["createTime"]);
+
+							side == "BUY" ? this._spec[$pair]["b_id"][parseFloat(price)] = $response["order_id"] : this._spec[$pair]["a_id"][parseFloat(price)] = $response["order_id"];
+							side == "BUY" ? this._spec[$pair]["b_time"][parseFloat(price)] = parseFloat($response["createTime"]) : this._spec[$pair]["a_time"][parseFloat(price)] = parseFloat($response["createTime"]);
 
 							resolve(true);
 
@@ -3005,8 +3105,18 @@ class MMBot {
 							console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " too many retry when opening " +
 							 +"order, order not opened on " + $pair + " ERROR:" + e); 
 
+							if (side == "BUY" && ref == 0) {
+
+								this._wallet[$pairs[1]] += price*quantity; 
+
+							} else if(ref == 0) {
+
+								this._wallet[$pairs[0]] += quantity;
+
+							}
+
 							clearTimeout(timer);
-							resolve(false)
+							resolve(false);
 						}
 
 					}
@@ -3044,73 +3154,186 @@ class MMBot {
 
 	}
 
+	async checkOne($pair,side){
+
+		return new Promise(async (resolve,reject) => {
+
+			if (side) {
+
+				await this._checkOne($pair,this._spec[$pair]["orderbook"]["asks"][0],"a_id");
+				resolve(true);
+
+			} else {
+
+				await this._checkOne($pair,this._spec[$pair]["orderbook"]["bids"][0],"b_id");
+				resolve(true);
+
+			}
+
+		})
+
+	}
+
+	async _checkOne(pair,price,side){
+
+		console.log("LOG: " + new Date().toUTCString() + " Checking: " + pair + " at: " + price + " side: " + side);
+
+		return new Promise(async (resolve,reject) =>{
+
+			if (this._callcounter > 200) {
+
+				console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " Check not done cause API call > 200");
+
+				resolve(true);
+
+			} else {
+
+				this._callcounter++;
+
+				var id = this._spec[pair][side][parseFloat(price)];	
+
+				var $response = "";
+
+				var $date =  new Date().getTime() - 3000;
+
+				var $data = '{"timestamp": '+ $date +',"recvWindow": 5000,"order_id": ' + id + '}';
+
+
+				var hmac = $crypto.createHmac("sha256",$private);
+				hmac.update($data);
+
+				var options = {
+
+					"hostname": "trade.coss.io",
+					"method": "POST",
+					"port": 443,
+					"path": "/c/api/v1/order/details",
+					"headers": {
+
+						"Content-Type": "application/json",
+						"Content-Length": $data.length,
+						"Authorization": $public,
+						"Signature": hmac.digest("hex")
+					}
+				}
+
+				var req = $https.request(options,async(res) => {
+
+					res.on("data", async (chunk) => {$response += chunk.toString(); });
+
+					res.on("end", async () => {
+
+						try{
+
+							$response = JSON.parse($response);
+
+							console.log($response);
+
+							if (!$response["order_id"]) {
+								console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " Check not done cause wrong response received");
+								throw new Error("unexpected response");
+
+							} else {
+
+								if ($response["status"] == "filled" || parseFloat($response["executed"]) / parseFloat($response["order_size"]) > (100 - this._spec[pair]['profit'])/100 ) {
+
+									console.log("LOG: " + new Date().toUTCString() + " order status " + $response["status"]);
+									console.log("LOG: " + new Date().toUTCString() + " order executed " + $response["executed"] + " order size initial " + $response["order_size"]);
+
+									delete this._spec[pair][side][parseFloat(price)];
+
+									if (side[0] == "a") {
+
+										console.log("pushing : ", {
+											"a": [price.toString(),0],
+											"b": [],
+											"t": new Date().getTime()
+										});
+
+										this._spec[pair]["poll"].push({
+											"a": [price.toString(),0],
+											"b": [],
+											"t": new Date().getTime()
+										});
+
+										resolve(true);
+
+									} else {
+
+										console.log("pushing : ", {
+											"b": [price.toString(),0],
+											"a": [],
+											"t": new Date().getTime()
+										});
+
+										this._spec[pair]["poll"].push({
+											"b": [price.toString(),0],
+											"a": [],
+											"t": new Date().getTime()
+										});
+
+										resolve(true);
+
+									}
+
+								} else {
+
+									console.log("LOG: " + new Date().toUTCString() + " order not filled ");
+
+									resolve(true);
+
+								}
+
+							}
+
+						} catch(e){
+
+							resolve(true);
+
+						}
+
+					});
+
+				});
+
+				req.on("error", async(e) => {
+
+					resolve(true);
+
+				});
+
+				req.end($data);
+
+			}
+		})
+
+	}
+
+	async checkTest(pair,price,side){
+
+		return new Promise(async(resolve,reject) => {
+
+			setTimeout(async ()=> {
+
+				if (this._spec[pair][side][price]) {
+
+					await this._checkOne(pair,price,side);
+					resolve(true);
+
+				} else {
+
+					resolve(true);
+
+				}
+				
+
+			},3000)
+
+		})
+
+	}
+
 
 }
 
-
-var coss = new MMBot({
-
-	/**
-	 * The pair on which you
-	 * want to help provide liquidity
-	 */
-
-	"COSS_ETH": {
-
-		/**
-		 * <Array> => [<Float>,<Float>]
-		 * The range which you want to cover
-		 * no order will be initially set beyond 
-		 * or above this limit
-		 */
-
-		"range": [0.00025,0.000314],
-
-		/**
-		 * <Int> 0 or 1 ONLY
-		 * a number which specifies
-		 * in which crypto orders will be calculated 
-		 * in this case orders will be calculated in COSS
-		 */
-
-		"ref": 1,
-
-		/**
-		 * Sets the total amount that will be used 
-		 * to set orders, ignored if amount field is specified 
-		 */
-
-
-		"total_amount_one": 900,
-		"total_amount_two": 0.3,
-
-		/**
-		 * The minimum profit you want to take
-		 * when a pair of order is excecuted
-		 * (in percent)
-		 */
-
-		"profit": 1,
-
-		/**
-		 * If set the total_amount field is ignored
-		 * sets the amount of each order.
-		 */
-
-		"amount": false,
-
-		/**
-		 * If set to true allow the orders to overflow the 
-		 * limit see documentation for more explanations and examples
-		 */
-
-		"allow_overflow": false,
-
-		"force_liquidity": true,
-
-		"auto_kill": true
-	}
-
-})
-
-
+module.exports = MMBot;
