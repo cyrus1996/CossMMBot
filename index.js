@@ -2999,10 +2999,9 @@ class MMBot {
 
 		if(price * quantity < this._amount_min.get($pairs[1])){
 
-			console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " order not opened amount too low, on " + $pair +
-				" price: ", price, " quantity: ", quantity, " base currency amount: ",price * quantity);
-
-			return false;
+			quantity = await this._ceil(this._amount_min.get($pairs[1]) / price,this._decimal.get($pair)["amount_decimal"]);
+            		console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " changing opening amount, on " + $pair +
+            		" price: ", price, " quantity: ", quantity, " base currency amount: ",price * quantity);
 		} 
 
 		if (side == "BUY" && ref == 0) {
