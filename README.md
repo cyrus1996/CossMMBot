@@ -25,12 +25,11 @@ In a futur update they could be splitted in several smaller files.
 
 This file is a tester, it should be used before using the **index.js** file 
 its purpose is to show you what orders are going to be opened and at which price, it source code also contains detailed commentary, that are not in the **index.js** file.
-**IMPORTANT this files doesn't require your private keys, but thus you have to manually tell the bot how many currency you have, you can see examples at the getWallet function**
+**IMPORTANT this files doesn't require your private keys, but thus you have to manually tell the bot how many currency you have, see examples below**
   
 Its output is similar to this : 
 
 ```
-$ node sandbox.js
 opening socket on COSS_ETH
 ---Ok on COSS_ETH
 we don't have COSS_ETH on binance
@@ -129,11 +128,44 @@ the process of the bot is listening to stin so just send it data. Data sent must
 	a or b,price,quantity,pair
 	eg : b,0.000298,0,COSS_ETH
 
+### Usage example : 
+
+For using the sandbox you have to create such file : 
+
+```javascript
+var coss = require("cossmmbot/sandbox.js");
+var bot = new coss({
+	"COSS_ETH": {
+	
+		"range": [0.00015,0.00022],
+		"ref": 1,
+
+		"total_amount_one": 900,
+		"total_amount_two": 0.3,
+
+		"profit": 1,
+
+		"amount": false,
+
+		"allow_overflow": false,
+
+		"force_liquidity": true,
+
+		"auto_kill": true
+	}
+},
+{
+	"COSS": 3000,
+	"ETH": 2
+})
+````
+Notice that the first argument is the specification for each pair, and the second argument is the wallet you want to emulate
+<br>
 ## Index.js File
 
   
 
-This is the main file, the output of this file contains kinds of output : 
+This is the main file, the output of this file contains those kinds of output : 
 ```
 LOG: Mon, 29 Apr 2019 20:42:01 GMT ...
 ```
@@ -174,14 +206,10 @@ If you don't send this cookie to the process this is not a problem the bot will 
 
 ### Input to the file
 
-The only things that you have to give to the file are your API Secret and API Public: 
-	
-	const $private = "your private"
-	const $public = "your public"
-
-And you also have to give to the bot the specification of the pairs you want to trade on : 
+You have to give to the bot the specification of the pairs you want to trade on : 
 ```javascript
-var coss = new MMBot({
+var bot = require("cossmmbot");
+var coss = new bot({
 	"COSS_ETH": {
 	
 		"range": [0.00025,0.000314],
@@ -200,10 +228,15 @@ var coss = new MMBot({
 
 		"auto_kill": true
 	}
-})
+},"YOUR PRIVATE","YOUR PUBLIC")
 ```
+And then just run your file : 
+
+	 $ node <your file>.js
+
+Notice that this is almost the same as the sandbox file, you just have to change the required file and the wallet by your private and public.
 <br>
-To create an instance of the class you should use such declaration :  
+To create an instance of the class you should use such declaration in a new file :  
 
 ```javascript
 var bot = require("cossmmbot");
@@ -354,3 +387,4 @@ BTC : 35Tv25zVtwvDSt3unxpctUpcUwo2cLcwBG
 ETH : 0xFa871bf7c97A9E062a7727bc67390471636E4CbF
 ```
 [plateform]: https://coss.io
+
