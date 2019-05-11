@@ -258,12 +258,12 @@ This is the interval in which your orders are going to be opened, no orders will
 <br>
 **Ref** : 
 ```javascript
-"ref":  0,
+"ref":  0 | 1 | 2,
 ```
 This is a key variable, it tells the bot on which crypto you want to make profit.
 For example if the pair is "COSS_ETH", basically what the bot does is that is splits the pair into an array or list (call it how you prefer) like this :
  `["COSS" , "ETH"]`
- If ref is 0 the bit will create orders for a fixed value of COSS (making you take profit in ETH), on the other hand if ref is 1 the bot will create orders for a fixed amount of ETH (making you take profit in COSS). 
+ If ref is 0 the bot will create orders for a fixed value of COSS (making you take profit in ETH), on the other hand if ref is 1 the bot will create orders for a fixed amount of ETH (making you take profit in COSS), and if ref is 2 profit are going the be equally splitted between the two crypto. 
  
  So to sum up : 
  * **If ref = 0 => profit in ETH**
