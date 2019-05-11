@@ -13,11 +13,11 @@ class MMBot {
 	/**
 	 * The main and unique class for market making on 
 	 * the COSS plateform for a complete documentation
-	 * see : https://
+	 * see : https://github.com/cyrus1996/CossMMBot
 	 */
 
 
-	constructor($spec){
+	constructor($spec,wallet){
 
 		/**
 		 * @var _spec <Object>
@@ -146,8 +146,6 @@ class MMBot {
 
 				this._spec[pair]["events"].once("finish", async() => {
 
-					console.log("dans le emit event");
-
 					await this.updateStripes(poll,pair);
 
 				})
@@ -162,7 +160,7 @@ class MMBot {
 		 * function asychronously 
 		 */
 
-		this.getWallet().then(async(value) => {
+		this.getWallet(wallet).then(async(value) => {
 
 			await this.getExchangeInfo();
 
@@ -515,16 +513,11 @@ class MMBot {
 	 * and stores the results in the _wallet variable
 	 */
 
-	async getWallet(){
-		
+	async getWallet(wallet){
+
 		return new Promise((resolve,reject) => {
 
-			this._wallet["COSS"] = 1000;
-			this._wallet["CFT"] = 10000;
-			this._wallet["ETH"] = 5;
-			this._wallet["BTC"] = 0.03;
-			this._wallet["DAI"] = 60;
-			this._wallet["KIN"] = 1200000;
+			this._wallet = wallet;
 			resolve(true);
 
 		})
@@ -833,7 +826,7 @@ class MMBot {
 
 							changes = true;
 
-							console.log(" profit: ",this._spec[pair]["profit"])
+							console.log("profit: ",this._spec[pair]["profit"])
 
 							var price = this._spec[pair]["orderbook"]["bids"][0] *
 							(this._spec[pair]["profit"] / 100 + 1);
@@ -842,8 +835,6 @@ class MMBot {
 							var price_ceil = await this._ceil(price,this._decimal.get(pair)["price_decimal"]);
 
 							price = val / price_ceil >= (this._spec[pair]["profit"] / 100 + 1) ? price_ceil : await this._floor(price,this._decimal.get(pair)["price_decimal"]);
-
-							console.log("price inter: ",price);
 
 							while (val / price < (this._spec[pair]["profit"] / 100 + 1)) {
 
@@ -864,6 +855,7 @@ class MMBot {
 								 * the same number of order opened at each time,
 								 * so if one order got excecuted we have to add one 
 								 * above our highest ask in this case, see docs for more details.
+								 * spec [];
 								 */
 
 								/**
@@ -1014,7 +1006,7 @@ class MMBot {
 							if (this._spec[pair]["orderbook"]["bids"].length <= 1) {
 
 									if (!this._spec[pair]["reminder_bids"]) {
-										console.log("on change le wallet")
+
 										this._wallet[$pairs[0]] += await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],value,pair);
 
 									}
@@ -1030,7 +1022,7 @@ class MMBot {
 
 							}
 
-							var price_new = await this._ceil(this._spec[pair]["orderbook"]["bids"][this._spec[pair]["orderbook"]["bids"].length - 1] /
+							var price_new = await this._floor(this._spec[pair]["orderbook"]["bids"][this._spec[pair]["orderbook"]["bids"].length - 1] /
 							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]); // floor
 
 
@@ -1087,9 +1079,11 @@ class MMBot {
 
 						price_ceil = await this._ceil(price,this._decimal.get(pair)["price_decimal"]);
 
-						price = this._spec[pair]["orderbook"]["asks"][0] / price_ceil < (this._spec[pair]["profit"]*2/100 + 1) || data["a"][0] / price_ceil < (this._spec[pair]["profit"]/100 + 1) ? await this._floor(price,this._decimal.get(pair)["price_decimal"]) : price_ceil;
+						var bask = await this._floor(this._spec[pair]["orderbook"]["asks"][0] / (this._spec[pair]["profit"]/100 + 1),this._decimal.get(pair)["price_decimal"]);
 
-						if (this._spec[pair]["orderbook"]["asks"][0] / price <= (this._spec[pair]["profit"]*2/100 + 1)|| this._spec[pair]["orderbook"]["bids"].includes(price) || /*data["a"][0] <= price*/ data["a"][0] / price < (this._spec[pair]["profit"]/100 + 1)) {
+						price = this._spec[pair]["orderbook"]["asks"][0] / price_ceil < (this._spec[pair]["profit"]*2/100 + 1) || bask / price_ceil < (this._spec[pair]["profit"]/100 + 1) ? await this._floor(price,this._decimal.get(pair)["price_decimal"]) : price_ceil;
+
+						if (this._spec[pair]["orderbook"]["asks"][0] / price <= (this._spec[pair]["profit"]*2/100 + 1)|| this._spec[pair]["orderbook"]["bids"].includes(price) || bask / price < (this._spec[pair]["profit"]/100 + 1)) {
 
 							break;
 
@@ -1217,7 +1211,7 @@ class MMBot {
 						changes = true;
 
 						var price = await this._ceil(this._spec[pair]["orderbook"]["bids"][0] *
-							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]); // floor
+							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]);
 
 						var amount = await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],price,pair);
 
@@ -1242,7 +1236,7 @@ class MMBot {
 							}
 
 							var price_new = await this._ceil(this._spec[pair]["orderbook"]["asks"][this._spec[pair]["orderbook"]["asks"].length - 1] *
-							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]); // ceil
+							(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]); 
 
 							if (this._spec[pair]["orderbook"]["asks"].length <= this._spec[pair]["orderbook"]["asks_length"]) {
 
@@ -1294,11 +1288,13 @@ class MMBot {
 
 						price_floor = await this._floor(price,this._decimal.get(pair)["price_decimal"]);
 
-						price = price_floor / this._spec[pair]["orderbook"]["bids"][0] < (this._spec[pair]["profit"]*2/100 + 1) || price_floor / data['b'][0] < (this._spec[pair]["profit"]/100 + 1) ? await this._ceil(price,this._decimal.get(pair)["price_decimal"]) : price_floor;
+						var bbid = await this._ceil(this._spec[pair]["orderbook"]["bids"][0] * (this._spec[pair]["profit"]/100 + 1),this._decimal.get(pair)["price_decimal"]);
+
+						price = price_floor / this._spec[pair]["orderbook"]["bids"][0] < (this._spec[pair]["profit"]*2/100 + 1) || price_floor / bbid < (this._spec[pair]["profit"]/100 + 1)? await this._ceil(price,this._decimal.get(pair)["price_decimal"]) : price_floor;
 
 						amount = await this.quantity(this._spec[pair]["amount"],this._spec[pair]["ref"],price,pair);
 
-						if (price / this._spec[pair]["orderbook"]["bids"][0] <= (this._spec[pair]["profit"]*2/100 + 1) || this._spec[pair]["orderbook"]["asks"].includes(price) || /*data['b'][0] >= price*/ price / data['b'][0] < (this._spec[pair]["profit"]/100 + 1)) {
+						if (price / this._spec[pair]["orderbook"]["bids"][0] <= (this._spec[pair]["profit"]*2/100 + 1) || this._spec[pair]["orderbook"]["asks"].includes(price) || price / bbid < (this._spec[pair]["profit"]/100 + 1)) {
 
 							break;
 
@@ -1398,7 +1394,7 @@ class MMBot {
 					 * prices.
 					 */
 
-					if (!(twice.includes("ETH") || twice.includes("BTC"))) {
+					if (!(twice.includes("ETH") && twice.includes("BTC"))) {
 
 						if (twice.includes("ETH")) {
 
@@ -1686,6 +1682,7 @@ class MMBot {
 					/**
 					 * Be carefull reaching here can lead 
 					 * to some lost in particular cases
+					 * see doc ________________________
 					 */
 
 					return await this.finalStripes(now["asks"], await this._floor(now["asks"]/ (this._spec[$pair]["profit"] * 2/100 + 1), dec),$pair)
@@ -1829,8 +1826,8 @@ class MMBot {
 
 			var [low_bid,high_ask] = this._spec[$pair]["range"];
 
-			$assert.ok(low_bid < high_ask,"The leftmost value of the range has to be the lowest")
-			$assert.ok(this._spec[$pair]["ref"] == 1 || this._spec[$pair]["ref"] == 0,"ref has to be 0 or 1 ONLY see doc");
+			$assert.ok(low_bid < high_ask," The leftmost value of the range has to be the lowest")
+			$assert.ok(this._spec[$pair]["ref"] == 1 || this._spec[$pair]["ref"] == 0 || this._spec[$pair]["ref"] == 2,"ref has to be 0 or 1 ONLY see doc");
 			$assert.ok(typeof this._spec[$pair]['amount'] == "number" || this._spec[$pair]["amount"] == false,"amount has to be an interger or false");
 
 			/**
@@ -1913,6 +1910,11 @@ class MMBot {
 						bid_start = await this._floor(bid_start / profit, dec);
 
 					}
+
+					console.log("quantity of "  + cryptoo1 + " used : " +  quantity1);
+					console.log("quantity of "  + cryptoo2 + " used : " +  quantity2);
+					console.log(cryptoo1 + " wallet : " +  crypto1);
+					console.log(cryptoo2 +  "wallet : " +  crypto2);
 
 					if (quantity1 > crypto1 || quantity2 > crypto2) {
 
@@ -2048,12 +2050,14 @@ class MMBot {
 
 				while(ready){
 
+
 					while(ask_start < high_ask){
 
 						/**
 						 * those while loops are used to
 						 * determine the number of orders that would be created on each pair
 						 */
+
 
 						quantity1 += 1
 
@@ -2140,7 +2144,8 @@ class MMBot {
 
 					while(ask_start < high_ask){
 
-						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],ask_start,$pair)
+
+						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],ask_start,$pair,"asks");
 
 						quantity1 += amount
 
@@ -2152,7 +2157,7 @@ class MMBot {
 
 					while(bid_start > low_bid){
 
-						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],bid_start,$pair)
+						var amount = await this.quantity(this._spec[$pair]["amount"],this._spec[$pair]["ref"],bid_start,$pair,"bids");
 
 						quantity2 += amount * bid_start;
 
@@ -2177,6 +2182,7 @@ class MMBot {
 							$bids = await this._floor(($bids * 10 ** dec - 1) / 10 ** dec, dec);
 
 						}
+
 						quantity1 = 0;
 						quantity2 = 0;
 						bid_start = $bids;
@@ -2277,7 +2283,7 @@ class MMBot {
 
 	}
 
-	async quantity($amount,$ref,$price,$pair){
+	async quantity($amount,$ref,$price,$pair,side = false){
 
 		if ($ref == 0) {
 
@@ -2285,7 +2291,22 @@ class MMBot {
 
 		} else if ($ref == 1) {
 
-			return await this._ceil($amount/$price,this._decimal.get($pair)["amount_decimal"])
+			return await this._ceil($amount/$price,this._decimal.get($pair)["amount_decimal"]);
+
+		} else if ($ref == 2) {
+
+			if (!this._spec[$pair]["alt_amount"]) {
+
+				var amount = await this._ceil($amount/$price,this._decimal.get($pair)["amount_decimal"]);
+				this._spec[$pair]["alt_amount"] = amount;
+
+				return amount;
+
+			} else {
+
+				return await this._ceil((($amount/$price) + this._spec[$pair]["alt_amount"]) / 2 ,this._decimal.get($pair)["amount_decimal"]);
+
+			}
 
 		}
 
@@ -2300,11 +2321,14 @@ class MMBot {
 
 		if(price * quantity < this._amount_min.get($pairs[1])){
 
+			quantity = await this._ceil(this._amount_min.get($pairs[1]) / price,this._decimal.get($pair)["amount_decimal"]);
+
 			console.log("Notice order not opened amount too low",price,quantity,price * quantity, " on pair " + $pair);
 			return false;
 		} 
 
 		if (side == "BUY") {
+			//console.log(`We take off ${price*quantity} from our wallet in ${$pairs[1]}`)
 			this._wallet[$pairs[1]] -= price*quantity;
 			if (this._wallet[$pairs[1]] < 0) {
 
@@ -2316,6 +2340,7 @@ class MMBot {
 
 		} else {
 
+			//console.log(`We take off ${quantity} from our wallet in ${$pairs[0]}`)
 			this._wallet[$pairs[0]] -= quantity;
 			if (this._wallet[$pairs[0]] < 0) {
 
@@ -2337,68 +2362,4 @@ class MMBot {
 
 }
 
-
-var coss = new MMBot({
-
-	/**
-	 * The pair on which you
-	 * want to help provide liquidity
-	 */
-
-	"COSS_ETH": {
-
-		/**
-		 * <Array> => [<Float>,<Float>]
-		 * The range which you want to cover
-		 * no order will be initially set beyond 
-		 * or above this limit
-		 */
-
-		"range": [0.0003,0.0004],
-
-		/**
-		 * <Int> 0 or 1 ONLY
-		 * a number which specifies
-		 * in which crypto orders will be calculated 
-		 * in this case orders will be calculated in COSS
-		 */
-
-		"ref": 1,
-
-		/**
-		 * Sets the total amount that will be used 
-		 * to set orders, ignored if amount field is specified 
-		 */
-
-
-		"total_amount_one": 7000,
-		"total_amount_two": 2,
-
-		/**
-		 * The minimum profit you want to take
-		 * when a pair of order is excecuted
-		 * (in percent)
-		 */
-
-		"profit": 1,
-
-		/**
-		 * If set the total_amount field is ignored
-		 * sets the amount of each order.
-		 */
-
-		"amount": false,
-
-		/**
-		 * If set to true allow the orders to overflow the 
-		 * limit see documentation for more explanations and examples
-		 */
-
-		"allow_overflow": false,
-
-		"force_liquidity": true,
-
-		"auto_kill": true
-	}
-
-})
+module.exports = MMBot;
