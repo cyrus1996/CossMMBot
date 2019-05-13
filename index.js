@@ -409,20 +409,43 @@ class MMBot {
 
 			data = data.toString().replace("\n","").replace("\r","");
 
-			switch(data){
+			if (data.includes("->")) {
 
-				case "getwallet":
-					this.getWallet(1).then(value => {
+				data = data.split("->");
 
-						console.log(this._wallet);
+				if (data[0] == "open") {
 
-					});
-					break;
+					var json = JSON.parse(data[1]);
 
-				default:
+					await this.getWallet(1);
+
+					for (var pair in json){
+
+						if (!this._spec[pair]) {
+
+							this._spec[pair] = json[pair];
+							await this.createSocket(pair);
+							this._interval["pair"].push(pair);
+
+						}
+					}
+
+
+				} else if (data[0] == "close") {
+
+					clearInterval(this._spec[data[1]]['pong']);
+					clearInterval(this._spec[data[1]]['timer']);
+					this._spec[data[1]]['socket'].removeAllListeners("data").removeAllListeners("error");
+					await this.cancelAllOrders(data[1]);
+					delete this._spec[data[1]];
+					console.log("LOG: " + new Date().toUTCString() + " orders cancelled on " + data[1]);
+
+				}
+
+			} else {
 
 				this._cookie = data;
-				break;
+
 			}
 
 		});
@@ -897,7 +920,7 @@ class MMBot {
 						let data = JSON.parse($data);
 
 						data.forEach((value) => {
-							this._wallet[value['currency_code']] = value['available'];
+							this._wallet[value['currency_code']] = parseFloat(value['available']);
 						});
 
 						console.log("LOG: " + new Date().toUTCString() + " succeed getting wallet ");
@@ -1047,9 +1070,9 @@ class MMBot {
 
 		this._spec[$pair]["created"] = false;
 
-		var pong = 0;
+		this._spec[$pair]['pong'] = 0;
 
-		var timer = 0;
+		this._spec[$pair]['timer'] = 0;
 
 		if(!this._decimal.has($pair)){
 
@@ -1062,9 +1085,9 @@ class MMBot {
 
 		return new Promise((resolve,reject) => {
 
-			var socket = $tls.connect(443,"engine.coss.io", async ()=>{
+			this._spec[$pair]['socket'] = $tls.connect(443,"engine.coss.io", async ()=>{
 
-				socket.write("GET /ws/v1/dp/" + $pair +" HTTP/1.1\r\n" +
+				this._spec[$pair]['socket'].write("GET /ws/v1/dp/" + $pair +" HTTP/1.1\r\n" +
 				"Host: engine.coss.io\r\n" +
 				"Accept: */*\r\nConnection: Upgrade\r\n" +
 				"Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
@@ -1076,7 +1099,7 @@ class MMBot {
 				 * is ready.
 				 */
 
-				socket.once("data",async (data) => {
+				this._spec[$pair]['socket'].once("data",async (data) => {
 
 					if(this._kill) return true;
 
@@ -1088,11 +1111,11 @@ class MMBot {
 						 * Pong frames according to RFC 6455
 						 */
 
-						pong = setInterval(() => {
-							socket.write(Buffer.from([0x8A,0x80,0x77,0x77,0x77,0x77]));
+						this._spec[$pair]['pong'] = setInterval(() => {
+							this._spec[$pair]["socket"].write(Buffer.from([0x8A,0x80,0x77,0x77,0x77,0x77]));
 						},20000);
 
-						timer = setInterval(async() => {
+						this._spec[$pair]['timer'] = setInterval(async() => {
 
 							if (this._spec[$pair]["created"] && this._spec[$pair]["lock"] && this._spec[$pair]["poll"].length) {
 
@@ -1123,9 +1146,9 @@ class MMBot {
 
 							console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " no orders will be opened on " + $pair +
 								" cause a problem occured while creating order book");
-							clearInterval(pong);
-							clearInterval(timer);
-							socket.removeAllListeners("data").removeAllListeners("error");
+							clearInterval(this._spec[$pair]['pong']);
+							clearInterval(this._spec[$pair]['timer']);
+							this._spec[$pair]['socket'].removeAllListeners("data").removeAllListeners("error");
 							resolve(false);
 
 						}
@@ -1163,29 +1186,30 @@ class MMBot {
 				 * every thing before.
 				 */
 
-				socket.on("error", async (err) => {
+				this._spec[$pair]['socket'].on("error", async (err) => {
 
 					if (ref > 3) {
 
 						console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " too many errors on "+ $pair +
 							" socket we will disable it. [Error] : " + err);
-						clearInterval(pong);
-						clearInterval(timer);
-						socket.removeAllListeners("data").removeAllListeners("error");
+						clearInterval(this._spec[$pair]['pong']);
+						clearInterval(this._spec[$pair]['timer']);
+						this._spec[$pair]['socket'].removeAllListeners("data").removeAllListeners("error");
 
 					} else {
 
 						console.log("\x1B[91mWARNING\x1B[0m: " + new Date().toUTCString() + " an error occured on socket "+ $pair +" we will try "+
 							"we will try to open it again error : " + err);
-						clearInterval(pong);
-						socket.removeAllListeners("data").removeAllListeners("error");
+						clearInterval(this._spec[$pair]['pong']);
+						clearInterval(this._spec[$pair]['timer']);
+						this._spec[$pair]['socket'].removeAllListeners("data").removeAllListeners("error");
 						await this.createSocket($pair,++ref);
 
 					}
 
 				})
 
-				socket.on("data",async (data) => {
+				this._spec[$pair]['socket'].on("data",async (data) => {
 
 
 					if (this._kill) { return false}
@@ -1462,7 +1486,7 @@ class MMBot {
 								}
 
 
-								if (this._spec[pair]["orderbook"]["asks"].length <= this._spec[pair]["orderbook"]["asks_length"]) {
+								if (this._spec[pair]["orderbook"]["asks"].length <= this._spec[pair]["orderbook"]["asks_length"] && this._spec[pair]["orderbook"]["asks"].length > 1) {
 
 									/**
 									 * we only want to have the same number of order as the moment
@@ -1616,7 +1640,7 @@ class MMBot {
 
 								}
 
-								if (this._spec[pair]["orderbook"]["bids"].length <= this._spec[pair]["orderbook"]["bids_length"]) {
+								if (this._spec[pair]["orderbook"]["bids"].length <= this._spec[pair]["orderbook"]["bids_length"] && this._spec[pair]["orderbook"]["bids"].length > 1) {
 
 									var price_new = await this._floor(this._spec[pair]["orderbook"]["bids"][this._spec[pair]["orderbook"]["bids"].length - 1] /
 										(this._spec[pair]["profit"] / 100 + 1),this._decimal.get(pair)["price_decimal"]);
@@ -3000,8 +3024,8 @@ class MMBot {
 		if(price * quantity < this._amount_min.get($pairs[1])){
 
 			quantity = await this._ceil(this._amount_min.get($pairs[1]) / price,this._decimal.get($pair)["amount_decimal"]);
-            		console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " changing opening amount, on " + $pair +
-            		" price: ", price, " quantity: ", quantity, " base currency amount: ",price * quantity);
+            console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " changing opening amount, on " + $pair +
+            " price: ", price, " quantity: ", quantity, " base currency amount: ",price * quantity);
 		} 
 
 		if (side == "BUY" && ref == 0) {
@@ -3175,8 +3199,6 @@ class MMBot {
 
 	async _checkOne(pair,price,side){
 
-		console.log("LOG: " + new Date().toUTCString() + " Checking: " + pair + " at: " + price + " side: " + side);
-
 		return new Promise(async (resolve,reject) =>{
 
 			if (this._callcounter > 200) {
@@ -3226,8 +3248,6 @@ class MMBot {
 
 							$response = JSON.parse($response);
 
-							console.log($response);
-
 							if (!$response["order_id"]) {
 								console.log("\x1B[38;5;226mNOTICE\x1B[0m: " + new Date().toUTCString() + " Check not done cause wrong response received");
 								throw new Error("unexpected response");
@@ -3276,8 +3296,6 @@ class MMBot {
 									}
 
 								} else {
-
-									console.log("LOG: " + new Date().toUTCString() + " order not filled ");
 
 									resolve(true);
 
