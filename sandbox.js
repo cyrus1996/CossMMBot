@@ -97,6 +97,12 @@ class MMBot {
 
 		this._spec = $spec;
 
+		for (var air in this._spec){
+
+			console.log("open->" + '{"' + air + '":' + JSON.stringify(this._spec[air]) + "}");
+
+		}
+
 		process.on("uncaughtException", (err) => {
 
 			console.log("ERROR: " + err.message);
@@ -116,6 +122,7 @@ class MMBot {
 		process.stdin.resume();
 
 		process.stdin.on("data", async (data) => {
+			
 			data = data.toString().replace("\n","");
 			data = data.split(",");
 			var poll = [];
@@ -575,7 +582,7 @@ class MMBot {
 
 	async createSocket($pair){
 
-		var pong = 0;
+		this._spec[$pair]["pong"] = 0;
 
 		this._spec[$pair]["events"] = new $events;
 
@@ -588,9 +595,9 @@ class MMBot {
 
 		return new Promise((resolve,reject) => {
 
-			var socket = $tls.connect(443,"engine.coss.io", async ()=>{
+			this._spec[$pair]["socket"] = $tls.connect(443,"engine.coss.io", async ()=>{
 
-				socket.write("GET /ws/v1/dp/" + $pair +" HTTP/1.1\r\n" +
+				this._spec[$pair]["socket"].write("GET /ws/v1/dp/" + $pair +" HTTP/1.1\r\n" +
 				"Host: engine.coss.io\r\n" +
 				"Accept: */*\r\nConnection: Upgrade\r\n" +
 				"Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
@@ -602,7 +609,7 @@ class MMBot {
 				 * is ready.
 				 */
 
-				socket.once("data",async (data) => {
+				this._spec[$pair]["socket"].once("data",async (data) => {
 
 					if (data.toString().indexOf("101") != -1) {
 
@@ -612,8 +619,8 @@ class MMBot {
 						 * Pong frames according to RFC 6455
 						 */
 
-						pong = setInterval(() => {
-							socket.write(Buffer.from([0x8A,0x80,0x77,0x77,0x77,0x77]));
+						this._spec[$pair]["pong"] = setInterval(() => {
+							this._spec[$pair]["socket"].write(Buffer.from([0x8A,0x80,0x77,0x77,0x77,0x77]));
 						},20000);
 
 						/**
@@ -641,8 +648,8 @@ class MMBot {
 						if (!$ob) {
 
 							console.log("error on : " + $pair + " err message : ", err);
-							clearInterval(pong);
-							socket.removeAllListeners("data").removeAllListeners("error");
+							clearInterval(this._spec[$pair]["pong"]);
+							this._spec[$pair]["socket"].removeAllListeners("data").removeAllListeners("error");
 							resolve(false);
 
 						}
@@ -668,15 +675,15 @@ class MMBot {
 				 * every thing before.
 				 */
 
-				socket.on("error", async (err) => {
+				this._spec[$pair]["socket"].on("error", async (err) => {
 					console.log("error on : " + $pair + " err message : ", err);
-					clearInterval(pong);
-					socket.removeAllListeners("data").removeAllListeners("error");
+					clearInterval(this._spec[$pair]["pong"]);
+					this._spec[$pair]["socket"].removeAllListeners("data").removeAllListeners("error");
 					await this.createSocket($pair);
 
 				})
 
-				socket.on("data",async (data) => {
+				this._spec[$pair]["socket"].on("data",async (data) => {
 
 					return true;
 
